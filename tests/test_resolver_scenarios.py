@@ -43,13 +43,20 @@ def source(tmp_path):
 def records(source):
     with ExitStack() as cleanup:
 
-        def create(*, backend="idalib", state=InstanceState.READY, path=None):
+        def create(
+            *,
+            backend="idalib",
+            state=InstanceState.READY,
+            path=None,
+            record_suffix=None,
+        ):
             registration = InstanceRegistration(
                 REGISTRY_DIR,
                 InstanceIdentity(
                     str(path or expected_idb_path(source)), str(source), backend
                 ),
                 token="test-token",
+                record_suffix=record_suffix,
             )
             cleanup.callback(registration.release)
             return DiscoveredDatabase(
@@ -188,7 +195,7 @@ def test_launcher_failure_reports_child_log_and_allows_retry(source, tmp_path):
 def test_worker_ready_for_wrong_database_is_never_returned(
     source, records, monkeypatch, tmp_path
 ):
-    wrong = records(path=tmp_path / "wrong.i64")
+    wrong = records(path=tmp_path / "wrong.i64", record_suffix="abcdef")
     monkeypatch.setattr(resolver, "_scan_until", lambda *_a, **_k: [wrong])
     with pytest.raises(WorkerStartError, match="expected"):
         resolver._await_ready(
@@ -197,6 +204,26 @@ def test_worker_ready_for_wrong_database_is_never_returned(
             tmp_path / "123-abcdef.log",
             time.monotonic() + 1,
         )
+
+
+def test_await_ready_ignores_unrelated_worker_with_same_pid(
+    source, records, monkeypatch, tmp_path
+):
+    unrelated = records(path=tmp_path / "beta.i64", record_suffix="111111")
+    launched = records(record_suffix="abcdef")
+    assert unrelated.instance.pid == launched.instance.pid
+    monkeypatch.setattr(
+        resolver, "_scan_until", lambda *_a, **_k: [unrelated, launched]
+    )
+
+    result = resolver._await_ready(
+        Mock(spec=subprocess.Popen, pid=launched.instance.pid),
+        expected_idb_path(source),
+        tmp_path / f"{launched.instance.record_id}.log",
+        time.monotonic() + 1,
+    )
+
+    assert result == launched.instance
 
 
 def test_startup_timeout_keeps_last_health_failure_and_log(

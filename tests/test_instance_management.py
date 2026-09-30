@@ -450,6 +450,7 @@ def test_resolver_builds_worker_import_options(tmp_path: Path) -> None:
             InstanceIdentity(expected_idb, source_path, "idalib"),
             AnalysisState(),
             REGISTRY_DIR,
+            record_suffix="abcdef",
         )
         server.start()
         servers.append(server)
@@ -457,7 +458,7 @@ def test_resolver_builds_worker_import_options(tmp_path: Path) -> None:
             subprocess.Popen[bytes],
             SimpleNamespace(pid=os.getpid(), poll=lambda: None),
         )
-        return process, tmp_path / "worker.log"
+        return process, tmp_path / f"{process.pid}-abcdef.log"
 
     try:
         result = resolve_instance(

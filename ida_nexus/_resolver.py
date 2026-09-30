@@ -409,9 +409,7 @@ def _await_ready(
         matched_record = False
         for instance in instances:
             entry = instance.instance
-            launched_by_us = entry.pid == process.pid or entry.record_id.endswith(
-                f"-{record_suffix}"
-            )
+            launched_by_us = entry.record_id.endswith(f"-{record_suffix}")
             if not launched_by_us:
                 continue
             matched_record = True
